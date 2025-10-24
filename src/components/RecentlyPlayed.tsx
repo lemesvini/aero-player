@@ -8,6 +8,7 @@ interface Track {
   album: {
     name: string;
     images: { url: string }[];
+    release_date: string;
   };
   duration_ms: number;
   played_at?: string;

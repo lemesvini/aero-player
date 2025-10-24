@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { SpotifyAuth } from "@/components/SpotifyAuth";
 import { SpotifyPlayer } from "@/components/SpotifyPlayer";
 import { AlbumArtPanel } from "@/components/AlbumArtPanel";
@@ -19,120 +19,115 @@ interface Track {
   played_at?: string;
 }
 
+interface Playlist {
+  id: string;
+  name: string;
+  images: { url: string }[];
+  tracks: { total: number };
+  owner: { display_name: string };
+}
+
 const Index = () => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
-  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("off");
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Check for callback from Spotify OAuth
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-
-    if (code) {
-      handleCallback(code);
-      window.history.replaceState({}, document.title, "/");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (accessToken) {
-      fetchRecentlyPlayed();
-      fetchPlaylists();
-      fetchCurrentPlayback();
-
-      const interval = setInterval(fetchCurrentPlayback, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [accessToken]);
-
-  const handleCallback = async (code: string) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spotify-auth`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ action: "callback", code }),
-        }
-      );
-
-      const data = await response.json();
-      if (data.access_token) {
-        localStorage.setItem("spotify_access_token", data.access_token);
-        setAccessToken(data.access_token);
-      }
-    } catch (error) {
-      console.error("Callback error:", error);
-      toast({
-        title: "Authentication Failed",
-        description: "Could not complete Spotify login",
-        variant: "destructive",
+  const fetchWithAuth = useCallback(
+    async (url: string, options: RequestInit = {}) => {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
-    }
-  };
 
-  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+      if (response.status === 401) {
+        localStorage.removeItem("spotify_access_token");
+        setAccessToken(null);
+        throw new Error("Token expired");
+      }
 
-    if (response.status === 401) {
-      localStorage.removeItem("spotify_access_token");
-      setAccessToken(null);
-      throw new Error("Token expired");
-    }
+      return response;
+    },
+    [accessToken]
+  );
 
-    return response;
-  };
+  const handleCallback = useCallback(
+    async (code: string) => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spotify-auth`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ action: "callback", code }),
+          }
+        );
 
-  const fetchRecentlyPlayed = async () => {
+        const data = await response.json();
+        if (data.access_token) {
+          localStorage.setItem("spotify_access_token", data.access_token);
+          setAccessToken(data.access_token);
+        }
+      } catch (error) {
+        console.error("Callback error:", error);
+        toast({
+          title: "Authentication Failed",
+          description: "Could not complete Spotify login",
+          variant: "destructive",
+        });
+      }
+    },
+    [toast]
+  );
+
+  const fetchRecentlyPlayed = useCallback(async () => {
     try {
       const response = await fetchWithAuth(
         "https://api.spotify.com/v1/me/player/recently-played?limit=20"
       );
       const data = await response.json();
 
-      if (data.items) {
-        const tracks = data.items.map((item: any) => ({
-          ...item.track,
-          played_at: item.played_at,
-          // Ensure arrays exist
-          artists: item.track?.artists || [],
-          album: {
-            ...item.track?.album,
-            images: item.track?.album?.images || [],
-          },
-        }));
+      if (data.items && Array.isArray(data.items)) {
+        const tracks = data.items.map(
+          (item: { track: Track; played_at: string }) => ({
+            ...item.track,
+            played_at: item.played_at,
+            // Ensure arrays exist
+            artists: item.track?.artists || [],
+            album: {
+              ...item.track?.album,
+              images: item.track?.album?.images || [],
+              release_date: item.track?.album?.release_date || "",
+            },
+          })
+        );
         setRecentTracks(tracks);
       }
     } catch (error) {
       console.error("Error fetching recently played:", error);
     }
-  };
+  }, [fetchWithAuth]);
 
-  const fetchPlaylists = async () => {
+  const fetchPlaylists = useCallback(async () => {
     try {
       const response = await fetchWithAuth(
         "https://api.spotify.com/v1/me/playlists?limit=50"
       );
       const data = await response.json();
 
-      if (data.items) {
+      if (data.items && Array.isArray(data.items)) {
         setPlaylists(
-          data.items.map((playlist: any) => ({
+          data.items.map((playlist: Playlist) => ({
             ...playlist,
             // Ensure arrays exist
             images: playlist?.images || [],
@@ -144,9 +139,9 @@ const Index = () => {
     } catch (error) {
       console.error("Error fetching playlists:", error);
     }
-  };
+  }, [fetchWithAuth]);
 
-  const fetchCurrentPlayback = async () => {
+  const fetchCurrentPlayback = useCallback(async () => {
     try {
       const response = await fetchWithAuth(
         "https://api.spotify.com/v1/me/player"
@@ -158,7 +153,7 @@ const Index = () => {
 
       const data = await response.json();
 
-      if (data.item) {
+      if (data.item && data.item.id) {
         setCurrentTrack({
           ...data.item,
           // Ensure arrays exist
@@ -166,6 +161,7 @@ const Index = () => {
           album: {
             ...data.item?.album,
             images: data.item?.album?.images || [],
+            release_date: data.item?.album?.release_date || "",
           },
         });
         setIsPlaying(data.is_playing);
@@ -176,7 +172,7 @@ const Index = () => {
     } catch (error) {
       console.error("Error fetching playback:", error);
     }
-  };
+  }, [fetchWithAuth]);
 
   const handlePlayPause = async () => {
     try {
@@ -288,6 +284,28 @@ const Index = () => {
       description: "Playlist view coming soon",
     });
   };
+
+  useEffect(() => {
+    // Check for callback from Spotify OAuth
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+
+    if (code) {
+      handleCallback(code);
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, [handleCallback]);
+
+  useEffect(() => {
+    if (accessToken) {
+      fetchRecentlyPlayed();
+      fetchPlaylists();
+      fetchCurrentPlayback();
+
+      const interval = setInterval(fetchCurrentPlayback, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [accessToken, fetchCurrentPlayback, fetchPlaylists, fetchRecentlyPlayed]);
 
   if (!accessToken) {
     return (

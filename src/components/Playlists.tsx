@@ -35,7 +35,7 @@ export const Playlists = ({ playlists, onPlaylistSelect }: PlaylistsProps) => {
               <div className="relative">
                 {playlist.images?.[0]?.url ? (
                   <img
-                    src={playlist.images[0].url}
+                    src={playlist.images?.[0]?.url}
                     alt={playlist.name}
                     className="w-12 h-12 rounded object-cover shadow-sm"
                   />
