@@ -1,5 +1,5 @@
-import { Clock } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Clock } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Track {
   id: string;
@@ -19,13 +19,17 @@ interface RecentlyPlayedProps {
   currentTrackId?: string;
 }
 
-export const RecentlyPlayed = ({ tracks, onTrackSelect, currentTrackId }: RecentlyPlayedProps) => {
+export const RecentlyPlayed = ({
+  tracks,
+  onTrackSelect,
+  currentTrackId,
+}: RecentlyPlayedProps) => {
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 60) return `${diffMins}m ago`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
@@ -42,25 +46,28 @@ export const RecentlyPlayed = ({ tracks, onTrackSelect, currentTrackId }: Recent
 
       <ScrollArea className="h-[400px]">
         <div className="space-y-1">
-          {tracks.map((track, index) => (
+          {tracks?.map((track, index) => (
             <button
               key={`${track.id}-${index}`}
               onClick={() => onTrackSelect(track)}
               className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all hover:bg-muted/50 ${
-                currentTrackId === track.id ? 'bg-primary/20 border border-primary/30' : ''
+                currentTrackId === track.id
+                  ? "bg-primary/20 border border-primary/30"
+                  : ""
               }`}
             >
               <img
-                src={track.album.images[2]?.url || track.album.images[0]?.url}
+                src={
+                  track.album.images?.[2]?.url || track.album.images?.[0]?.url
+                }
                 alt={track.album.name}
                 className="w-12 h-12 rounded object-cover shadow-sm"
               />
               <div className="flex-1 text-left min-w-0">
-                <p className="font-medium truncate text-sm">
-                  {track.name}
-                </p>
+                <p className="font-medium truncate text-sm">{track.name}</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {track.artists.map(a => a.name).join(', ')}
+                  {track.artists?.map((a) => a.name).join(", ") ||
+                    "Unknown Artist"}
                 </p>
                 {track.played_at && (
                   <p className="text-xs text-muted-foreground/70 mt-0.5">
@@ -69,7 +76,7 @@ export const RecentlyPlayed = ({ tracks, onTrackSelect, currentTrackId }: Recent
                 )}
               </div>
             </button>
-          ))}
+          )) || []}
         </div>
       </ScrollArea>
     </div>

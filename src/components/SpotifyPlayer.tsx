@@ -1,7 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Shuffle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
+import { useState, useEffect, useRef } from "react";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  Repeat,
+  Shuffle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 
 interface Track {
   id: string;
@@ -55,7 +63,7 @@ export const SpotifyPlayer = ({
     const seconds = Math.floor(ms / 1000);
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleVolumeChange = (value: number[]) => {
@@ -74,7 +82,9 @@ export const SpotifyPlayer = ({
     return (
       <div className="glass-panel glass-highlight rounded-2xl p-8 text-center">
         <p className="text-muted-foreground">No track playing</p>
-        <p className="text-sm text-muted-foreground mt-2">Select a track to start playback</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Select a track to start playback
+        </p>
       </div>
     );
   }
@@ -84,14 +94,19 @@ export const SpotifyPlayer = ({
       {/* Album Art & Metadata for Mobile */}
       <div className="lg:hidden flex flex-col items-center space-y-4">
         <img
-          src={currentTrack.album.images[0]?.url}
+          src={currentTrack.album.images?.[0]?.url}
           alt={currentTrack.album.name}
           className="w-48 h-48 rounded-xl shadow-card"
         />
         <div className="text-center">
           <h2 className="text-2xl font-semibold">{currentTrack.name}</h2>
-          <p className="text-muted-foreground">{currentTrack.artists.map(a => a.name).join(', ')}</p>
-          <p className="text-sm text-muted-foreground mt-1">{currentTrack.album.name}</p>
+          <p className="text-muted-foreground">
+            {currentTrack.artists?.map((a) => a.name).join(", ") ||
+              "Unknown Artist"}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {currentTrack.album.name}
+          </p>
         </div>
       </div>
 
@@ -116,7 +131,7 @@ export const SpotifyPlayer = ({
           variant="ghost"
           size="icon"
           onClick={onToggleShuffle}
-          className={shuffle ? 'text-secondary' : 'text-muted-foreground'}
+          className={shuffle ? "text-secondary" : "text-muted-foreground"}
         >
           <Shuffle className="h-5 w-5" />
         </Button>
@@ -155,7 +170,9 @@ export const SpotifyPlayer = ({
           variant="ghost"
           size="icon"
           onClick={onToggleRepeat}
-          className={repeat !== 'off' ? 'text-secondary' : 'text-muted-foreground'}
+          className={
+            repeat !== "off" ? "text-secondary" : "text-muted-foreground"
+          }
         >
           <Repeat className="h-5 w-5" />
         </Button>

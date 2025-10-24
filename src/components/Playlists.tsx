@@ -1,6 +1,6 @@
-import { Music, ChevronRight } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
+import { Music, ChevronRight } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
 interface Playlist {
   id: string;
@@ -25,7 +25,7 @@ export const Playlists = ({ playlists, onPlaylistSelect }: PlaylistsProps) => {
 
       <ScrollArea className="h-[400px]">
         <div className="space-y-1">
-          {playlists.map((playlist) => (
+          {playlists?.map((playlist) => (
             <Button
               key={playlist.id}
               variant="ghost"
@@ -33,7 +33,7 @@ export const Playlists = ({ playlists, onPlaylistSelect }: PlaylistsProps) => {
               className="w-full justify-start gap-3 h-auto py-3 px-3 hover:bg-muted/50"
             >
               <div className="relative">
-                {playlist.images[0]?.url ? (
+                {playlist.images?.[0]?.url ? (
                   <img
                     src={playlist.images[0].url}
                     alt={playlist.name}
@@ -46,16 +46,14 @@ export const Playlists = ({ playlists, onPlaylistSelect }: PlaylistsProps) => {
                 )}
               </div>
               <div className="flex-1 text-left min-w-0">
-                <p className="font-medium truncate text-sm">
-                  {playlist.name}
-                </p>
+                <p className="font-medium truncate text-sm">{playlist.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {playlist.tracks.total} tracks • {playlist.owner.display_name}
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             </Button>
-          ))}
+          )) || []}
         </div>
       </ScrollArea>
     </div>

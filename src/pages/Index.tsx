@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { SpotifyAuth } from '@/components/SpotifyAuth';
-import { SpotifyPlayer } from '@/components/SpotifyPlayer';
-import { AlbumArtPanel } from '@/components/AlbumArtPanel';
-import { RecentlyPlayed } from '@/components/RecentlyPlayed';
-import { Playlists } from '@/components/Playlists';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from "react";
+import { SpotifyAuth } from "@/components/SpotifyAuth";
+import { SpotifyPlayer } from "@/components/SpotifyPlayer";
+import { AlbumArtPanel } from "@/components/AlbumArtPanel";
+import { RecentlyPlayed } from "@/components/RecentlyPlayed";
+import { Playlists } from "@/components/Playlists";
+import { useToast } from "@/hooks/use-toast";
 
 interface Track {
   id: string;
@@ -27,17 +27,17 @@ const Index = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState('off');
+  const [repeat, setRepeat] = useState("off");
   const { toast } = useToast();
 
   useEffect(() => {
     // Check for callback from Spotify OAuth
     const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    
+    const code = params.get("code");
+
     if (code) {
       handleCallback(code);
-      window.history.replaceState({}, document.title, '/');
+      window.history.replaceState({}, document.title, "/");
     }
   }, []);
 
@@ -46,7 +46,7 @@ const Index = () => {
       fetchRecentlyPlayed();
       fetchPlaylists();
       fetchCurrentPlayback();
-      
+
       const interval = setInterval(fetchCurrentPlayback, 3000);
       return () => clearInterval(interval);
     }
@@ -57,25 +57,25 @@ const Index = () => {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spotify-auth`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify({ action: 'callback', code }),
+          body: JSON.stringify({ action: "callback", code }),
         }
       );
 
       const data = await response.json();
       if (data.access_token) {
-        localStorage.setItem('spotify_access_token', data.access_token);
+        localStorage.setItem("spotify_access_token", data.access_token);
         setAccessToken(data.access_token);
       }
     } catch (error) {
-      console.error('Callback error:', error);
+      console.error("Callback error:", error);
       toast({
-        title: 'Authentication Failed',
-        description: 'Could not complete Spotify login',
-        variant: 'destructive',
+        title: "Authentication Failed",
+        description: "Could not complete Spotify login",
+        variant: "destructive",
       });
     }
   };
@@ -85,115 +85,134 @@ const Index = () => {
       ...options,
       headers: {
         ...options.headers,
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
-    
+
     if (response.status === 401) {
-      localStorage.removeItem('spotify_access_token');
+      localStorage.removeItem("spotify_access_token");
       setAccessToken(null);
-      throw new Error('Token expired');
+      throw new Error("Token expired");
     }
-    
+
     return response;
   };
 
   const fetchRecentlyPlayed = async () => {
     try {
       const response = await fetchWithAuth(
-        'https://api.spotify.com/v1/me/player/recently-played?limit=20'
+        "https://api.spotify.com/v1/me/player/recently-played?limit=20"
       );
       const data = await response.json();
-      
+
       if (data.items) {
         const tracks = data.items.map((item: any) => ({
           ...item.track,
           played_at: item.played_at,
+          // Ensure arrays exist
+          artists: item.track?.artists || [],
+          album: {
+            ...item.track?.album,
+            images: item.track?.album?.images || [],
+          },
         }));
         setRecentTracks(tracks);
       }
     } catch (error) {
-      console.error('Error fetching recently played:', error);
+      console.error("Error fetching recently played:", error);
     }
   };
 
   const fetchPlaylists = async () => {
     try {
       const response = await fetchWithAuth(
-        'https://api.spotify.com/v1/me/playlists?limit=50'
+        "https://api.spotify.com/v1/me/playlists?limit=50"
       );
       const data = await response.json();
-      
+
       if (data.items) {
-        setPlaylists(data.items);
+        setPlaylists(
+          data.items.map((playlist: any) => ({
+            ...playlist,
+            // Ensure arrays exist
+            images: playlist?.images || [],
+            tracks: playlist?.tracks || { total: 0 },
+            owner: playlist?.owner || { display_name: "Unknown" },
+          }))
+        );
       }
     } catch (error) {
-      console.error('Error fetching playlists:', error);
+      console.error("Error fetching playlists:", error);
     }
   };
 
   const fetchCurrentPlayback = async () => {
     try {
       const response = await fetchWithAuth(
-        'https://api.spotify.com/v1/me/player'
+        "https://api.spotify.com/v1/me/player"
       );
-      
+
       if (response.status === 204) {
         return;
       }
-      
+
       const data = await response.json();
-      
+
       if (data.item) {
-        setCurrentTrack(data.item);
+        setCurrentTrack({
+          ...data.item,
+          // Ensure arrays exist
+          artists: data.item?.artists || [],
+          album: {
+            ...data.item?.album,
+            images: data.item?.album?.images || [],
+          },
+        });
         setIsPlaying(data.is_playing);
         setProgress(data.progress_ms || 0);
         setShuffle(data.shuffle_state);
         setRepeat(data.repeat_state);
       }
     } catch (error) {
-      console.error('Error fetching playback:', error);
+      console.error("Error fetching playback:", error);
     }
   };
 
   const handlePlayPause = async () => {
     try {
-      const endpoint = isPlaying ? 'pause' : 'play';
-      await fetchWithAuth(
-        `https://api.spotify.com/v1/me/player/${endpoint}`,
-        { method: 'PUT' }
-      );
+      const endpoint = isPlaying ? "pause" : "play";
+      await fetchWithAuth(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+        method: "PUT",
+      });
       setIsPlaying(!isPlaying);
     } catch (error) {
       toast({
-        title: 'Playback Error',
-        description: 'Make sure Spotify is active on a device',
-        variant: 'destructive',
+        title: "Playback Error",
+        description: "Make sure Spotify is active on a device",
+        variant: "destructive",
       });
     }
   };
 
   const handleNext = async () => {
     try {
-      await fetchWithAuth(
-        'https://api.spotify.com/v1/me/player/next',
-        { method: 'POST' }
-      );
+      await fetchWithAuth("https://api.spotify.com/v1/me/player/next", {
+        method: "POST",
+      });
       setTimeout(fetchCurrentPlayback, 500);
     } catch (error) {
-      console.error('Error skipping track:', error);
+      console.error("Error skipping track:", error);
     }
   };
 
   const handlePrevious = async () => {
     try {
-      await fetchWithAuth(
-        'https://api.spotify.com/v1/me/player/previous',
-        { method: 'POST' }
-      );
+      await fetchWithAuth("https://api.spotify.com/v1/me/player/previous", {
+        method: "POST",
+      });
       setTimeout(fetchCurrentPlayback, 500);
     } catch (error) {
-      console.error('Error going to previous track:', error);
+      console.error("Error going to previous track:", error);
     }
   };
 
@@ -201,10 +220,10 @@ const Index = () => {
     try {
       await fetchWithAuth(
         `https://api.spotify.com/v1/me/player/seek?position_ms=${position}`,
-        { method: 'PUT' }
+        { method: "PUT" }
       );
     } catch (error) {
-      console.error('Error seeking:', error);
+      console.error("Error seeking:", error);
     }
   };
 
@@ -212,10 +231,10 @@ const Index = () => {
     try {
       await fetchWithAuth(
         `https://api.spotify.com/v1/me/player/volume?volume_percent=${volume}`,
-        { method: 'PUT' }
+        { method: "PUT" }
       );
     } catch (error) {
-      console.error('Error changing volume:', error);
+      console.error("Error changing volume:", error);
     }
   };
 
@@ -223,52 +242,50 @@ const Index = () => {
     try {
       await fetchWithAuth(
         `https://api.spotify.com/v1/me/player/shuffle?state=${!shuffle}`,
-        { method: 'PUT' }
+        { method: "PUT" }
       );
       setShuffle(!shuffle);
     } catch (error) {
-      console.error('Error toggling shuffle:', error);
+      console.error("Error toggling shuffle:", error);
     }
   };
 
   const handleToggleRepeat = async () => {
     try {
-      const nextRepeat = repeat === 'off' ? 'context' : repeat === 'context' ? 'track' : 'off';
+      const nextRepeat =
+        repeat === "off" ? "context" : repeat === "context" ? "track" : "off";
       await fetchWithAuth(
         `https://api.spotify.com/v1/me/player/repeat?state=${nextRepeat}`,
-        { method: 'PUT' }
+        { method: "PUT" }
       );
       setRepeat(nextRepeat);
     } catch (error) {
-      console.error('Error toggling repeat:', error);
+      console.error("Error toggling repeat:", error);
     }
   };
 
   const handleTrackSelect = async (track: Track) => {
     try {
-      await fetchWithAuth(
-        'https://api.spotify.com/v1/me/player/play',
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            uris: [`spotify:track:${track.id}`],
-          }),
-        }
-      );
+      await fetchWithAuth("https://api.spotify.com/v1/me/player/play", {
+        method: "PUT",
+        body: JSON.stringify({
+          uris: [`spotify:track:${track.id}`],
+        }),
+      });
       setTimeout(fetchCurrentPlayback, 500);
     } catch (error) {
       toast({
-        title: 'Playback Error',
-        description: 'Make sure Spotify is active on a device',
-        variant: 'destructive',
+        title: "Playback Error",
+        description: "Make sure Spotify is active on a device",
+        variant: "destructive",
       });
     }
   };
 
   const handlePlaylistSelect = (playlistId: string) => {
     toast({
-      title: 'Playlist Selected',
-      description: 'Playlist view coming soon',
+      title: "Playlist Selected",
+      description: "Playlist view coming soon",
     });
   };
 
@@ -292,7 +309,9 @@ const Index = () => {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
                 SpotiPlayer
               </h1>
-              <p className="text-sm text-muted-foreground">Windows 7 Style Media Player</p>
+              <p className="text-sm text-muted-foreground">
+                Windows 7 Style Media Player
+              </p>
             </div>
             <SpotifyAuth onAuthSuccess={setAccessToken} />
           </div>

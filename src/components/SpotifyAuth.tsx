@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { LogOut, User } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SpotifyUser {
   display_name: string;
@@ -24,12 +24,12 @@ export const SpotifyAuth = ({ onAuthSuccess }: SpotifyAuthProps) => {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('spotify_access_token');
+      const token = localStorage.getItem("spotify_access_token");
       if (token) {
-        const response = await fetch('https://api.spotify.com/v1/me', {
+        const response = await fetch("https://api.spotify.com/v1/me", {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         if (response.ok) {
@@ -37,11 +37,11 @@ export const SpotifyAuth = ({ onAuthSuccess }: SpotifyAuthProps) => {
           setUser(userData);
           onAuthSuccess(token);
         } else {
-          localStorage.removeItem('spotify_access_token');
+          localStorage.removeItem("spotify_access_token");
         }
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error("Auth check failed:", error);
     } finally {
       setLoading(false);
     }
@@ -49,8 +49,8 @@ export const SpotifyAuth = ({ onAuthSuccess }: SpotifyAuthProps) => {
 
   const handleLogin = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('spotify-auth', {
-        body: { action: 'authorize' }
+      const { data, error } = await supabase.functions.invoke("spotify-auth", {
+        body: { action: "authorize" },
       });
 
       if (error) throw error;
@@ -58,12 +58,12 @@ export const SpotifyAuth = ({ onAuthSuccess }: SpotifyAuthProps) => {
         window.location.href = data.url;
       }
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error("Login failed:", error);
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('spotify_access_token');
+    localStorage.removeItem("spotify_access_token");
     setUser(null);
   };
 
@@ -79,7 +79,7 @@ export const SpotifyAuth = ({ onAuthSuccess }: SpotifyAuthProps) => {
     return (
       <div className="flex items-center gap-3">
         <Avatar className="h-10 w-10 border-2 border-primary/30">
-          <AvatarImage src={user.images[0]?.url} alt={user.display_name} />
+          <AvatarImage src={user.images?.[0]?.url} alt={user.display_name} />
           <AvatarFallback>
             <User className="h-5 w-5" />
           </AvatarFallback>
