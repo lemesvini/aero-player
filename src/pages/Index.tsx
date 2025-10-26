@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
+import { Search } from "lucide-react";
 import { SpotifyAuth } from "@/components/SpotifyAuth";
 import { PlayerView } from "@/components/PlayerView";
 import { RecentlyPlayed } from "@/components/RecentlyPlayed";
 import { Playlists } from "@/components/Playlists";
 import { PlaylistDetails } from "@/components/PlaylistDetails";
+import { AlbumDetails } from "@/components/AlbumDetails";
 import { QueueDialog } from "@/components/QueueDialog";
+import { SearchDialog } from "@/components/SearchDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 interface Track {
@@ -13,6 +17,7 @@ interface Track {
   name: string;
   artists: { name: string }[];
   album: {
+    id: string;
     name: string;
     images: { url: string }[];
     release_date: string;
@@ -35,12 +40,15 @@ const Index = () => {
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [queueDialogOpen, setQueueDialogOpen] = useState(false);
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("off");
+  const [activeTab, setActiveTab] = useState("player");
   const { toast } = useToast();
 
   const fetchWithAuth = useCallback(
@@ -112,6 +120,7 @@ const Index = () => {
               // Ensure arrays exist
               artists: item.track?.artists || [],
               album: {
+                id: item.track?.album?.id || "",
                 ...item.track?.album,
                 images: item.track?.album?.images || [],
                 release_date: item.track?.album?.release_date || "",
@@ -168,6 +177,7 @@ const Index = () => {
           // Ensure arrays exist
           artists: data.item?.artists || [],
           album: {
+            id: data.item?.album?.id || "",
             ...data.item?.album,
             images: data.item?.album?.images || [],
             release_date: data.item?.album?.release_date || "",
@@ -306,6 +316,16 @@ const Index = () => {
     setQueue((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleAlbumClick = () => {
+    // Use the current track's album ID
+    const track = currentTrack;
+    if (track && track.album?.id) {
+      setSelectedAlbumId(track.album.id);
+      setSelectedPlaylist(null);
+      setActiveTab("playlists");
+    }
+  };
+
   useEffect(() => {
     // Check for callback from Spotify OAuth
     const params = new URLSearchParams(window.location.search);
@@ -343,7 +363,7 @@ const Index = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <header className="glass-panel glass-highlight rounded-2xl p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
                 SpotiPlayer
@@ -352,12 +372,22 @@ const Index = () => {
                 Windows 7 Style Media Player
               </p>
             </div>
-            <SpotifyAuth onAuthSuccess={setAccessToken} />
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setSearchDialogOpen(true)}
+                className="gap-2"
+              >
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">Search Songs</span>
+              </Button>
+              <SpotifyAuth onAuthSuccess={setAccessToken} />
+            </div>
           </div>
         </header>
 
         {/* Main Content */}
-        <Tabs defaultValue="player" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
             <TabsTrigger value="player">Player</TabsTrigger>
             <TabsTrigger value="playlists">Playlists</TabsTrigger>
@@ -376,6 +406,7 @@ const Index = () => {
               onToggleShuffle={handleToggleShuffle}
               onToggleRepeat={handleToggleRepeat}
               onOpenQueue={() => setQueueDialogOpen(true)}
+              onAlbumClick={handleAlbumClick}
               shuffle={shuffle}
               repeat={repeat}
             />
@@ -391,7 +422,15 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="playlists">
-            {selectedPlaylist ? (
+            {selectedAlbumId ? (
+              <AlbumDetails
+                albumId={selectedAlbumId}
+                onBack={() => setSelectedAlbumId(null)}
+                onTrackSelect={handleTrackSelect}
+                onAddToQueue={handleAddToQueue}
+                accessToken={accessToken!}
+              />
+            ) : selectedPlaylist ? (
               <PlaylistDetails
                 playlist={selectedPlaylist}
                 onBack={() => setSelectedPlaylist(null)}
@@ -416,6 +455,14 @@ const Index = () => {
           queue={queue}
           onRemoveFromQueue={handleRemoveFromQueue}
           onTrackSelect={handleTrackSelect}
+        />
+
+        <SearchDialog
+          open={searchDialogOpen}
+          onOpenChange={setSearchDialogOpen}
+          accessToken={accessToken!}
+          onTrackSelect={handleTrackSelect}
+          onAddToQueue={handleAddToQueue}
         />
       </div>
     </div>

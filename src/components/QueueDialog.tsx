@@ -13,8 +13,10 @@ interface Track {
   name: string;
   artists: { name: string }[];
   album: {
+    id: string;
     name: string;
     images: { url: string }[];
+    release_date: string;
   };
   duration_ms: number;
 }

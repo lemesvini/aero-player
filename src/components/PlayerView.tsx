@@ -17,6 +17,7 @@ interface Track {
   name: string;
   artists: { name: string }[];
   album: {
+    id: string;
     name: string;
     images: { url: string }[];
     release_date: string;
@@ -36,6 +37,7 @@ interface PlayerViewProps {
   onToggleShuffle: () => void;
   onToggleRepeat: () => void;
   onOpenQueue: () => void;
+  onAlbumClick: () => void;
   shuffle: boolean;
   repeat: string;
 }
@@ -52,6 +54,7 @@ export const PlayerView = ({
   onToggleShuffle,
   onToggleRepeat,
   onOpenQueue,
+  onAlbumClick,
   shuffle,
   repeat,
 }: PlayerViewProps) => {
@@ -115,10 +118,13 @@ export const PlayerView = ({
               <p className="text-xl text-muted-foreground mb-1">
                 {currentTrack.artists?.map((a) => a.name).join(", ")}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <button
+                onClick={onAlbumClick}
+                className="text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors"
+              >
                 {currentTrack.album.name} •{" "}
                 {new Date(currentTrack.album.release_date).getFullYear()}
-              </p>
+              </button>
             </div>
 
             {/* Progress Bar */}

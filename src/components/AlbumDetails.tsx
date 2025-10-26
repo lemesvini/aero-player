@@ -20,55 +20,50 @@ interface Track {
     release_date: string;
   };
   duration_ms: number;
+  track_number: number;
 }
 
-interface PlaylistTrack {
-  track: {
-    id: string;
-    name: string;
-    artists: { name: string }[];
-    album: {
-      id: string;
-      name: string;
-      images: { url: string }[];
-      release_date: string;
-    };
-    duration_ms: number;
-  };
+interface AlbumTrack {
+  id: string;
+  name: string;
+  artists: { name: string }[];
+  duration_ms: number;
+  track_number: number;
 }
 
-interface Playlist {
+interface Album {
   id: string;
   name: string;
   images: { url: string }[];
-  tracks: { total: number };
-  owner: { display_name: string };
-  description?: string;
+  artists: { name: string }[];
+  release_date: string;
+  total_tracks: number;
 }
 
-interface PlaylistDetailsProps {
-  playlist: Playlist;
+interface AlbumDetailsProps {
+  albumId: string;
   onBack: () => void;
   onTrackSelect: (track: Track) => void;
   onAddToQueue: (track: Track) => void;
   accessToken: string;
 }
 
-export const PlaylistDetails = ({
-  playlist,
+export const AlbumDetails = ({
+  albumId,
   onBack,
   onTrackSelect,
   onAddToQueue,
   accessToken,
-}: PlaylistDetailsProps) => {
+}: AlbumDetailsProps) => {
+  const [album, setAlbum] = useState<Album | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchPlaylistTracks = async () => {
+    const fetchAlbumDetails = async () => {
       try {
         const response = await fetch(
-          `https://api.spotify.com/v1/playlists/${playlist.id}/tracks`,
+          `https://api.spotify.com/v1/albums/${albumId}`,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -76,30 +71,41 @@ export const PlaylistDetails = ({
           }
         );
         const data = await response.json();
-        
-        if (data.items && Array.isArray(data.items)) {
-          const playlistTracks = data.items
-            .filter((item: PlaylistTrack) => item.track !== null)
-            .map((item: PlaylistTrack) => ({
-              ...item.track,
-              album: {
-                id: item.track.album?.id || "",
-                ...item.track.album,
-                images: item.track.album?.images || [],
-                release_date: item.track.album?.release_date || "",
-              },
-            }));
-          setTracks(playlistTracks);
+
+        setAlbum({
+          id: data.id,
+          name: data.name,
+          images: data.images || [],
+          artists: data.artists || [],
+          release_date: data.release_date || "",
+          total_tracks: data.total_tracks || 0,
+        });
+
+        if (data.tracks?.items) {
+          const albumTracks = data.tracks.items.map((item: AlbumTrack) => ({
+            id: item.id,
+            name: item.name,
+            artists: item.artists || [],
+            album: {
+              id: data.id,
+              name: data.name,
+              images: data.images || [],
+              release_date: data.release_date || "",
+            },
+            duration_ms: item.duration_ms,
+            track_number: item.track_number,
+          }));
+          setTracks(albumTracks);
         }
       } catch (error) {
-        console.error("Error fetching playlist tracks:", error);
+        console.error("Error fetching album details:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPlaylistTracks();
-  }, [playlist.id, accessToken]);
+    fetchAlbumDetails();
+  }, [albumId, accessToken]);
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -108,23 +114,38 @@ export const PlaylistDetails = ({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  if (loading) {
+    return (
+      <div className="glass-panel glass-highlight rounded-2xl p-6 text-center">
+        <p className="text-muted-foreground">Loading album...</p>
+      </div>
+    );
+  }
+
+  if (!album) {
+    return (
+      <div className="glass-panel glass-highlight rounded-2xl p-6 text-center">
+        <p className="text-muted-foreground">Album not found</p>
+        <Button onClick={onBack} className="mt-4">
+          Go Back
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="glass-panel glass-highlight rounded-2xl p-6">
-        <Button
-          variant="ghost"
-          onClick={onBack}
-          className="mb-4"
-        >
+        <Button variant="ghost" onClick={onBack} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Playlists
+          Back
         </Button>
 
         <div className="flex gap-6 items-start">
-          {playlist.images?.[0]?.url ? (
+          {album.images?.[0]?.url ? (
             <img
-              src={playlist.images[0].url}
-              alt={playlist.name}
+              src={album.images[0].url}
+              alt={album.name}
               className="w-48 h-48 rounded-xl shadow-card"
             />
           ) : (
@@ -134,14 +155,15 @@ export const PlaylistDetails = ({
           )}
 
           <div className="flex-1">
-            <h1 className="text-4xl font-bold mb-2">{playlist.name}</h1>
-            {playlist.description && (
-              <p className="text-muted-foreground mb-4">{playlist.description}</p>
-            )}
+            <p className="text-sm text-muted-foreground mb-1">Album</p>
+            <h1 className="text-4xl font-bold mb-2">{album.name}</h1>
+            <p className="text-lg text-muted-foreground mb-2">
+              {album.artists?.map((a) => a.name).join(", ")}
+            </p>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{playlist.owner.display_name}</span>
+              <span>{new Date(album.release_date).getFullYear()}</span>
               <span>•</span>
-              <span>{playlist.tracks.total} tracks</span>
+              <span>{album.total_tracks} songs</span>
             </div>
           </div>
         </div>
@@ -149,33 +171,22 @@ export const PlaylistDetails = ({
 
       <div className="glass-panel glass-highlight rounded-2xl p-4">
         <ScrollArea className="h-[500px]">
-          {loading ? (
+          {tracks.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              Loading tracks...
-            </div>
-          ) : tracks.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No tracks in this playlist
+              No tracks found
             </div>
           ) : (
             <div className="space-y-1">
-              {tracks.map((track, index) => (
-                <ContextMenu key={`${track.id}-${index}`}>
+              {tracks.map((track) => (
+                <ContextMenu key={track.id}>
                   <ContextMenuTrigger>
                     <button
                       onClick={() => onTrackSelect(track)}
                       className="w-full flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors text-left"
                     >
                       <span className="text-sm text-muted-foreground w-8">
-                        {index + 1}
+                        {track.track_number}
                       </span>
-                      <img
-                        src={
-                          track.album.images?.[2]?.url || track.album.images?.[0]?.url
-                        }
-                        alt={track.album.name}
-                        className="w-12 h-12 rounded object-cover shadow-sm"
-                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{track.name}</p>
                         <p className="text-sm text-muted-foreground truncate">
