@@ -8,6 +8,7 @@ import { PlaylistDetails } from "@/components/PlaylistDetails";
 import { AlbumDetails } from "@/components/AlbumDetails";
 import { QueueDialog } from "@/components/QueueDialog";
 import { SearchDialog } from "@/components/SearchDialog";
+import { PlaylistGalleryDialog } from "@/components/PlaylistGalleryDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -42,10 +43,14 @@ const Index = () => {
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(
     null
   );
+  const [selectedPlaylistTracks, setSelectedPlaylistTracks] = useState<Track[]>(
+    []
+  );
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [queueDialogOpen, setQueueDialogOpen] = useState(false);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
@@ -98,7 +103,7 @@ const Index = () => {
         console.error("Callback error:", error);
         toast({
           title: "Authentication Failed",
-          description: "Could not complete Spotify login",
+          description: "Could not complete login",
           variant: "destructive",
         });
       }
@@ -217,7 +222,7 @@ const Index = () => {
     } catch (error) {
       toast({
         title: "Playback Error",
-        description: "Make sure Spotify is active on a device",
+        description: "Make sure a device is active",
         variant: "destructive",
       });
     }
@@ -225,23 +230,74 @@ const Index = () => {
 
   const handleNext = async () => {
     try {
-      await fetchWithAuth("https://api.spotify.com/v1/me/player/next", {
-        method: "POST",
+      const response = await fetchWithAuth(
+        "https://api.spotify.com/v1/me/player/next",
+        {
+          method: "POST",
+        }
+      );
+
+      if (response.ok) {
+        // Success - refresh playback state
+        setTimeout(fetchCurrentPlayback, 500);
+        return;
+      }
+
+      // If API call fails, check if we have a queue
+      if (queue.length > 0) {
+        // Play the first track from our local queue
+        const nextTrack = queue[0];
+        await handleTrackSelect(nextTrack, true);
+        handleRemoveFromQueue(0);
+        return;
+      }
+
+      // No queue available, show error
+      const errorText = await response.text();
+      console.error("Next track error:", response.status, errorText);
+      toast({
+        title: "Cannot skip track",
+        description: "No queue or context available",
+        variant: "destructive",
       });
-      setTimeout(fetchCurrentPlayback, 500);
     } catch (error) {
       console.error("Error skipping track:", error);
+      toast({
+        title: "Network Error",
+        description: "Could not skip to next track",
+        variant: "destructive",
+      });
     }
   };
 
   const handlePrevious = async () => {
     try {
-      await fetchWithAuth("https://api.spotify.com/v1/me/player/previous", {
-        method: "POST",
-      });
+      const response = await fetchWithAuth(
+        "https://api.spotify.com/v1/me/player/previous",
+        {
+          method: "POST",
+        }
+      );
+
+      if (!response.ok) {
+        console.error("Previous track error:", response.status);
+        toast({
+          title: "Cannot go to previous track",
+          description: "No context available to navigate",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Success - refresh playback state
       setTimeout(fetchCurrentPlayback, 500);
     } catch (error) {
       console.error("Error going to previous track:", error);
+      toast({
+        title: "Network Error",
+        description: "Could not go to previous track",
+        variant: "destructive",
+      });
     }
   };
 
@@ -339,30 +395,110 @@ const Index = () => {
     }
   };
 
-  const handleTrackSelect = async (track: Track) => {
-    try {
-      await fetchWithAuth("https://api.spotify.com/v1/me/player/play", {
-        method: "PUT",
-        body: JSON.stringify({
-          uris: [`spotify:track:${track.id}`],
-        }),
-      });
-      setTimeout(fetchCurrentPlayback, 500);
-    } catch (error) {
-      toast({
-        title: "Playback Error",
-        description: "Make sure Spotify is active on a device",
-        variant: "destructive",
-      });
-    }
-  };
+  const handleTrackSelect = useCallback(
+    async (track: Track, clearPlaylist: boolean = false) => {
+      try {
+        // If we have a playlist selected and it should be kept, play with context for auto-advance
+        if (
+          !clearPlaylist &&
+          selectedPlaylist &&
+          selectedPlaylistTracks.length > 0
+        ) {
+          const currentIndex = selectedPlaylistTracks.findIndex(
+            (t) => t.id === track.id
+          );
 
-  const handlePlaylistSelect = (playlistId: string) => {
-    const playlist = playlists.find((p) => p.id === playlistId);
-    if (playlist) {
+          console.log(
+            `Playing track ${currentIndex + 1} of ${
+              selectedPlaylistTracks.length
+            } from playlist`
+          );
+
+          // Use context_uri to ensure playlist context is maintained
+          await fetchWithAuth("https://api.spotify.com/v1/me/player/play", {
+            method: "PUT",
+            body: JSON.stringify({
+              context_uri: `spotify:playlist:${selectedPlaylist.id}`,
+              offset: { uri: `spotify:track:${track.id}` },
+              position_ms: 0,
+            }),
+          });
+        } else {
+          // Single track playback without context
+          if (clearPlaylist) {
+            setSelectedPlaylist(null);
+            setSelectedPlaylistTracks([]);
+          }
+
+          await fetchWithAuth("https://api.spotify.com/v1/me/player/play", {
+            method: "PUT",
+            body: JSON.stringify({
+              uris: [`spotify:track:${track.id}`],
+            }),
+          });
+        }
+        setTimeout(fetchCurrentPlayback, 500);
+      } catch (error) {
+        toast({
+          title: "Playback Error",
+          description: "Make sure a device is active",
+          variant: "destructive",
+        });
+      }
+    },
+    [
+      fetchWithAuth,
+      fetchCurrentPlayback,
+      toast,
+      selectedPlaylist,
+      selectedPlaylistTracks,
+    ]
+  );
+
+  const handlePlaylistSelect = useCallback(
+    async (playlist: Playlist) => {
       setSelectedPlaylist(playlist);
-    }
-  };
+
+      // Fetch playlist tracks
+      try {
+        const response = await fetchWithAuth(
+          `https://api.spotify.com/v1/playlists/${playlist.id}/tracks`
+        );
+        const data = await response.json();
+
+        if (data.items && Array.isArray(data.items)) {
+          const playlistTracks = data.items
+            .filter((item: { track: Track | null }) => item.track !== null)
+            .map((item: { track: Track }) => ({
+              ...item.track,
+              artists: item.track?.artists || [],
+              album: {
+                id: item.track?.album?.id || "",
+                ...item.track?.album,
+                images: item.track?.album?.images || [],
+                release_date: item.track?.album?.release_date || "",
+              },
+            }));
+
+          setSelectedPlaylistTracks(playlistTracks);
+
+          // Play the first track if available
+          if (playlistTracks.length > 0) {
+            const firstTrack = playlistTracks[0];
+            await handleTrackSelect(firstTrack, false);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching playlist tracks:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load playlist",
+          variant: "destructive",
+        });
+      }
+    },
+    [fetchWithAuth, handleTrackSelect, toast]
+  );
 
   const handleAddToQueue = (track: Track) => {
     setQueue((prev) => [...prev, track]);
@@ -409,25 +545,34 @@ const Index = () => {
   }, [accessToken, fetchCurrentPlayback, fetchPlaylists, fetchRecentlyPlayed]);
 
   if (!accessToken) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md glass-panel glass-highlight rounded-2xl">
-          <SpotifyAuth onAuthSuccess={setAccessToken} />
-        </div>
-      </div>
-    );
+    return <SpotifyAuth onAuthSuccess={setAccessToken} />;
   }
 
   return (
     <div className="h-screen flex justify-center items-center bg-gradient-to-b from-black via-black/10 to-black">
       <div className="absolute left-16 flex flex-col items-center justify-center gap-2">
-        <Button variant="ghost" size="icon">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setQueueDialogOpen(true)}
+          className="text-white border-white/20 hover:bg-white/5"
+        >
           <ListMusic className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSearchDialogOpen(true)}
+          className="text-white border-white/20 hover:bg-white/5"
+        >
           <Search className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setLibraryDialogOpen(true)}
+          className="text-white border-white/20 hover:bg-white/5"
+        >
           <Library className="h-5 w-5" />
         </Button>
       </div>
@@ -445,11 +590,14 @@ const Index = () => {
           onToggleRepeat={handleToggleRepeat}
           onOpenQueue={() => setQueueDialogOpen(true)}
           onTrackSelect={handleTrackSelect}
+          onAddToQueue={handleAddToQueue}
           onToggleLike={handleToggleLike}
           shuffle={shuffle}
           repeat={repeat}
           isLiked={isLiked}
           accessToken={accessToken!}
+          selectedPlaylist={selectedPlaylist}
+          selectedPlaylistTracks={selectedPlaylistTracks}
         />
         {/* <div className="max-w-4xl mx-auto">
               <RecentlyPlayed
@@ -487,7 +635,7 @@ const Index = () => {
           )}
         </TabsContent> */}
 
-        {/* <QueueDialog
+        <QueueDialog
           open={queueDialogOpen}
           onOpenChange={setQueueDialogOpen}
           queue={queue}
@@ -501,7 +649,14 @@ const Index = () => {
           accessToken={accessToken!}
           onTrackSelect={handleTrackSelect}
           onAddToQueue={handleAddToQueue}
-        /> */}
+        />
+
+        <PlaylistGalleryDialog
+          open={libraryDialogOpen}
+          onOpenChange={setLibraryDialogOpen}
+          playlists={playlists}
+          onPlaylistSelect={handlePlaylistSelect}
+        />
       </div>
     </div>
   );

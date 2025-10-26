@@ -52,33 +52,40 @@ export const QueueDialog = ({
 
         <ScrollArea className="h-[400px] pr-4">
           {queue.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="text-center py-12 text-white/40">
               <p>Queue is empty</p>
-              <p className="text-sm mt-2">Right-click on songs to add them to queue</p>
+              <p className="text-sm mt-2">
+                Right-click on songs to add them to queue
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
               {queue.map((track, index) => (
                 <div
                   key={`${track.id}-${index}`}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 group"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 group border border-white/10"
                 >
                   <button
                     onClick={() => onTrackSelect(track)}
                     className="flex items-center gap-3 flex-1 min-w-0"
                   >
                     <img
-                      src={track.album.images?.[2]?.url || track.album.images?.[0]?.url}
+                      src={
+                        track.album.images?.[2]?.url ||
+                        track.album.images?.[0]?.url
+                      }
                       alt={track.album.name}
                       className="w-12 h-12 rounded object-cover shadow-sm"
                     />
                     <div className="flex-1 text-left min-w-0">
-                      <p className="font-medium truncate text-sm">{track.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="font-medium truncate text-sm text-white">
+                        {track.name}
+                      </p>
+                      <p className="text-xs text-white/40 truncate">
                         {track.artists?.map((a) => a.name).join(", ")}
                       </p>
                     </div>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-white/40">
                       {formatTime(track.duration_ms)}
                     </span>
                   </button>

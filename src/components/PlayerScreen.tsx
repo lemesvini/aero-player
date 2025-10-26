@@ -15,6 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import GlassSurface from "./GlassSurface";
 
 interface Track {
@@ -48,6 +54,14 @@ interface Album {
   total_tracks: number;
 }
 
+interface Playlist {
+  id: string;
+  name: string;
+  images: { url: string }[];
+  tracks: { total: number };
+  owner: { display_name: string };
+}
+
 interface PlayerScreenProps {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -59,13 +73,16 @@ interface PlayerScreenProps {
   onToggleShuffle: () => void;
   onToggleRepeat: () => void;
   onOpenQueue: () => void;
-  onTrackSelect: (track: Track) => void;
+  onTrackSelect: (track: Track, clearPlaylist?: boolean) => void;
+  onAddToQueue: (track: Track) => void;
   onToggleLike: (trackId: string) => void;
   onBack?: () => void;
   shuffle: boolean;
   repeat: string;
   isLiked: boolean;
   accessToken: string;
+  selectedPlaylist?: Playlist | null;
+  selectedPlaylistTracks?: Track[];
 }
 
 export const PlayerScreen = ({
@@ -80,12 +97,15 @@ export const PlayerScreen = ({
   onToggleRepeat,
   onOpenQueue,
   onTrackSelect,
+  onAddToQueue,
   onToggleLike,
   onBack,
   shuffle,
   repeat,
   isLiked,
   accessToken,
+  selectedPlaylist,
+  selectedPlaylistTracks = [],
 }: PlayerScreenProps) => {
   const [localProgress, setLocalProgress] = useState(progress);
   const [album, setAlbum] = useState<Album | null>(null);
@@ -198,12 +218,15 @@ export const PlayerScreen = ({
       {/* Left Section - Album Art */}
       <div className="w-full md:w-1/2 flex-shrink-0 relative overflow-hidden group">
         <CardContainer className="w-full h-full p-0">
-          <CardItem className="p-0">
-            <CardBody>
+          <CardItem className="p-0 w-full h-full">
+            <CardBody className="w-full h-full">
               <img
-                src={currentTrack.album.images?.[0]?.url}
-                alt={currentTrack.album.name}
-                className="w-full h-full object-fill transition-transform duration-300 ease-in-out group-hover:scale-105"
+                src={
+                  selectedPlaylist?.images?.[0]?.url ||
+                  currentTrack.album.images?.[0]?.url
+                }
+                alt={selectedPlaylist?.name || currentTrack.album.name}
+                className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
               />
 
               {/* Media Controls at Center - Visible on Hover */}
@@ -227,7 +250,10 @@ export const PlayerScreen = ({
                     mixBlendMode="overlay"
                   >
                     <button
-                      onClick={onPrevious}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPrevious();
+                      }}
                       className="w-full h-full flex items-center justify-center text-white transition-colors drop-shadow-lg"
                     >
                       <SkipBack className="h-7 w-7" />
@@ -252,7 +278,10 @@ export const PlayerScreen = ({
                     mixBlendMode="overlay"
                   >
                     <button
-                      onClick={onPlayPause}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPlayPause();
+                      }}
                       className="w-full h-full flex items-center justify-center text-white transition-colors drop-shadow-lg"
                     >
                       {isPlaying ? (
@@ -281,7 +310,10 @@ export const PlayerScreen = ({
                     mixBlendMode="overlay"
                   >
                     <button
-                      onClick={onNext}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNext();
+                      }}
                       className="w-full h-full flex items-center justify-center text-white transition-colors drop-shadow-lg"
                     >
                       <SkipForward className="h-7 w-7" />
@@ -312,10 +344,13 @@ export const PlayerScreen = ({
         <div className="p-4 md:p-8 border-b border-white/10">
           <div className="mb-4 md:mb-6">
             <p className="text-xs md:text-sm text-white/60 mb-2 font-light">
-              {album?.artists?.map((a) => a.name).join(", ")} /{" "}
-              {album?.release_date
-                ? new Date(album.release_date).getFullYear()
-                : ""}
+              {selectedPlaylist
+                ? `${selectedPlaylist.owner.display_name} • Playlist`
+                : `${album?.artists?.map((a) => a.name).join(", ")} / ${
+                    album?.release_date
+                      ? new Date(album.release_date).getFullYear()
+                      : ""
+                  }`}
             </p>
             <div className="flex items-center gap-3">
               <div className="overflow-hidden relative flex-1">
@@ -331,76 +366,115 @@ export const PlayerScreen = ({
                   }
                 >
                   <span className={isScrolling ? "flex-shrink-0" : ""}>
-                    {currentTrack.name}
+                    {selectedPlaylist
+                      ? selectedPlaylist.name
+                      : currentTrack.name}
                   </span>
                   {isScrolling && (
                     <span className="flex-shrink-0 px-8">
-                      {currentTrack.name}
+                      {selectedPlaylist
+                        ? selectedPlaylist.name
+                        : currentTrack.name}
                     </span>
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => onToggleLike(currentTrack.id)}
-                className="flex-shrink-0 p-2 hover:bg-white/10 rounded-full transition-colors"
-                aria-label={isLiked ? "Unlike track" : "Like track"}
-              >
-                <Heart
-                  className={`h-6 w-6 md:h-7 md:w-7 transition-all ${
-                    isLiked
-                      ? "fill-white text-white"
-                      : "text-white/60 hover:text-white"
-                  }`}
-                />
-              </button>
+              {!selectedPlaylist && (
+                <button
+                  onClick={() => onToggleLike(currentTrack.id)}
+                  className="flex-shrink-0 p-2 hover:bg-white/10 rounded-full transition-colors"
+                  aria-label={isLiked ? "Unlike track" : "Like track"}
+                >
+                  <Heart
+                    className={`h-6 w-6 md:h-7 md:w-7 transition-all ${
+                      isLiked
+                        ? "fill-white text-white"
+                        : "text-white/60 hover:text-white"
+                    }`}
+                  />
+                </button>
+              )}
             </div>
             <p className="text-sm md:text-lg text-white/60 font-light mt-2 md:mt-3">
-              {currentTrack.album?.name || album?.name || ""}
+              {selectedPlaylist
+                ? `${selectedPlaylistTracks.length} songs`
+                : currentTrack.album?.name || album?.name || ""}
             </p>
           </div>
         </div>
 
-        {/* Middle Section - Album Tracks */}
+        {/* Middle Section - Tracks (Playlist or Album) */}
         <ScrollArea className="flex-1 overflow-auto">
           <div className="px-4 md:px-8 py-4 space-y-0">
-            {albumTracks.length === 0 ? (
-              <div className="text-center py-12 text-white/40">
-                {loading ? "Loading tracks..." : "No tracks available"}
-              </div>
-            ) : (
-              albumTracks.map((track) => {
-                const isCurrentTrack = track.id === currentTrack.id;
+            {(() => {
+              const tracksToShow = selectedPlaylist
+                ? selectedPlaylistTracks
+                : albumTracks;
+
+              if (tracksToShow.length === 0) {
                 return (
-                  <button
-                    key={track.id}
-                    onClick={() => onTrackSelect(track)}
-                    className={`w-full flex items-center gap-4 px-3 py-2.5 rounded hover:bg-white/5 transition-colors text-left ${
-                      isCurrentTrack ? "bg-white/10" : ""
-                    }`}
-                  >
-                    <span className="text-sm text-white/40 w-8 text-right font-light">
-                      {track.track_number ? (
-                        isCurrentTrack ? (
-                          <Pause className="h-4 w-4 mx-auto" />
-                        ) : (
-                          String(track.track_number).padStart(2, "0")
-                        )
-                      ) : (
-                        ""
-                      )}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm leading-relaxed">
-                        {track.name}
-                      </p>
-                    </div>
-                    <span className="text-sm text-white/40 font-light">
-                      {formatTime(track.duration_ms)}
-                    </span>
-                  </button>
+                  <div className="text-center py-12 text-white/40">
+                    {loading ? "Loading tracks..." : "No tracks available"}
+                  </div>
                 );
-              })
-            )}
+              }
+
+              return tracksToShow.map((track, index) => {
+                const isCurrentTrack = track.id === currentTrack.id;
+                const trackNumber = selectedPlaylist
+                  ? index + 1
+                  : track.track_number;
+
+                return (
+                  <ContextMenu key={track.id}>
+                    <ContextMenuTrigger>
+                      <button
+                        onClick={() => onTrackSelect(track, !selectedPlaylist)}
+                        className={`w-full flex items-center gap-4 px-3 py-2.5 rounded hover:bg-white/5 transition-colors text-left ${
+                          isCurrentTrack ? "bg-white/10" : ""
+                        }`}
+                      >
+                        <span className="text-sm text-white/40 w-8 text-right font-light">
+                          {trackNumber ? (
+                            isCurrentTrack ? (
+                              <Pause className="h-4 w-4 mx-auto" />
+                            ) : (
+                              String(trackNumber).padStart(2, "0")
+                            )
+                          ) : (
+                            ""
+                          )}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-sm leading-relaxed">
+                            {track.name}{" "}
+                            {selectedPlaylist
+                              ? " - " +
+                                track.artists?.map((a) => a.name).join(", ")
+                              : null}
+                          </p>
+                        </div>
+                        <span className="text-sm text-white/40 font-light">
+                          {formatTime(track.duration_ms)}
+                        </span>
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onClick={() => onTrackSelect(track, !selectedPlaylist)}
+                      >
+                        <Play className="h-4 w-4 mr-2 text-white" />
+                        <span className="text-white">Play Now</span>
+                      </ContextMenuItem>
+                      <ContextMenuItem onClick={() => onAddToQueue(track)}>
+                        <ListMusic className="h-4 w-4 mr-2" />
+                        <span className="text-white">Add to Queue</span>
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                );
+              });
+            })()}
           </div>
         </ScrollArea>
 

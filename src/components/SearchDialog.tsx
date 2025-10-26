@@ -84,14 +84,14 @@ export const SearchDialog = ({
 
         const data = await response.json();
         if (data.tracks?.items) {
-          const tracks = data.tracks.items.map((track: any) => ({
+          const tracks = data.tracks.items.map((track: unknown) => ({
             ...track,
             album: {
-              id: track.album?.id || "",
-              ...track.album,
-              release_date: track.album?.release_date || "",
+              id: (track as Track).album?.id || "",
+              ...(track as Track).album,
+              release_date: (track as Track).album?.release_date || "",
             },
-          }));
+          })) as Track[];
           setResults(tracks);
         }
       } catch (err) {
@@ -127,7 +127,7 @@ export const SearchDialog = ({
 
         <div className="space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -138,28 +138,26 @@ export const SearchDialog = ({
             {query && (
               <button
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-white">{error}</p>}
 
           <ScrollArea className="h-[400px]">
             {loading ? (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-12 text-white/40">
                 Searching...
               </div>
             ) : results.length === 0 && query ? (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-12 text-white/40">
                 No results found for "{query}"
               </div>
             ) : results.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-12 text-white/40">
                 Start typing to search for songs
               </div>
             ) : (
@@ -169,7 +167,7 @@ export const SearchDialog = ({
                     <ContextMenuTrigger>
                       <button
                         onClick={() => handleTrackSelect(track)}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 border border-white/10 transition-colors text-left"
                       >
                         <img
                           src={
@@ -180,12 +178,14 @@ export const SearchDialog = ({
                           className="w-12 h-12 rounded object-cover shadow-sm"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{track.name}</p>
-                          <p className="text-sm text-muted-foreground truncate">
+                          <p className="font-medium truncate text-white">
+                            {track.name}
+                          </p>
+                          <p className="text-sm text-white/40 truncate">
                             {track.artists?.map((a) => a.name).join(", ")}
                           </p>
                         </div>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-sm text-white/40">
                           {formatTime(track.duration_ms)}
                         </span>
                       </button>

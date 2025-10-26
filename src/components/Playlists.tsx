@@ -12,7 +12,7 @@ interface Playlist {
 
 interface PlaylistsProps {
   playlists: Playlist[];
-  onPlaylistSelect: (playlistId: string) => void;
+  onPlaylistSelect: (playlist: Playlist) => void;
 }
 
 export const Playlists = ({ playlists, onPlaylistSelect }: PlaylistsProps) => {
@@ -29,7 +29,7 @@ export const Playlists = ({ playlists, onPlaylistSelect }: PlaylistsProps) => {
             <Button
               key={playlist.id}
               variant="ghost"
-              onClick={() => onPlaylistSelect(playlist.id)}
+              onClick={() => onPlaylistSelect(playlist)}
               className="w-full justify-start gap-3 h-auto py-3 px-3 hover:bg-muted/50"
             >
               <div className="relative">

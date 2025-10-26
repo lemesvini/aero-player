@@ -22,7 +22,7 @@ All colors MUST be HSL.
     --primary: 210 70% 55%;
     --primary-foreground: 0 0% 100%;
     --primary-glow: 210 80% 65%;
-    
+
     /* Spotify Green Accent */
     --secondary: 141 73% 42%;
     --secondary-foreground: 0 0% 100%;
@@ -46,7 +46,7 @@ All colors MUST be HSL.
     --glass-background: 210 25% 15% / 0.7;
     --glass-border: 210 40% 35% / 0.3;
     --glass-highlight: 210 60% 70% / 0.1;
-    
+
     /* Shadows & Glows */
     --shadow-glow: 0 0 30px hsl(210 70% 55% / 0.3);
     --shadow-card: 0 10px 40px hsl(210 50% 10% / 0.8);
@@ -64,7 +64,7 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   }
 
   /* Glass Panel Effects */
@@ -81,15 +81,16 @@ All colors MUST be HSL.
   }
 
   .glass-highlight::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, 
-      transparent, 
-      hsl(var(--glass-highlight)), 
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--glass-highlight)),
       transparent
     );
   }
@@ -97,7 +98,7 @@ All colors MUST be HSL.
   /* Glow Effects */
   .glow-primary {
     box-shadow: 0 0 20px hsl(var(--primary) / 0.4),
-                inset 0 1px 2px hsl(var(--primary-glow) / 0.2);
+      inset 0 1px 2px hsl(var(--primary-glow) / 0.2);
   }
 
   .hover-glow {
@@ -107,5 +108,23 @@ All colors MUST be HSL.
   .hover-glow:hover {
     box-shadow: var(--shadow-glow);
     transform: translateY(-1px);
+  }
+}
+
+@layer utilities {
+  @keyframes scroll-left {
+    0%,
+    15% {
+      transform: translateX(0);
+    }
+    85%,
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-scroll-left {
+    display: flex;
+    animation: scroll-left 20s linear infinite;
   }
 }

@@ -101,20 +101,53 @@ export const SpotifyAuth = ({ onAuthSuccess }: SpotifyAuthProps) => {
   }
 
   return (
-    <div className="text-center p-6 space-y-4">
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold">Connect to Spotify</h3>
-        <p className="text-sm text-muted-foreground">
-          Sign in with your Spotify account to start playing music
-        </p>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-6">
+      <div className="w-full max-w-md space-y-8">
+        {/* Logo/Icon */}
+        <div className="flex justify-center">
+          <div className="relative">
+            <div className="absolute inset-0 bg-white blur-2xl opacity-10 rounded-full"></div>
+            <div className="relative w-24 h-24 border-2 border-white rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 border-2 border-white rounded-full"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="space-y-2 text-center">
+          <h1 className="text-4xl font-bold tracking-tight">aero-player</h1>
+          <p className="text-sm text-white/60 font-light tracking-wider">
+            Windows 7 Style Music Player
+          </p>
+        </div>
+
+        {/* Login Section */}
+        <div className="space-y-6 pt-8">
+          <div className="border-t border-b border-white/10 py-6">
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-medium">Connect to Start</h3>
+              <p className="text-sm text-white/40 font-light">
+                Sign in to access your music library
+              </p>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleLogin}
+            className="w-full h-14 bg-white text-black hover:bg-white/90 font-medium text-base transition-all duration-200 border border-white/20 shadow-lg"
+            size="lg"
+          >
+            Connect Account
+          </Button>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-12 text-center">
+          <p className="text-xs text-white/30 font-light tracking-wide">
+            © 2024 aero-player
+          </p>
+        </div>
       </div>
-      <Button
-        onClick={handleLogin}
-        className="glow-primary bg-secondary hover:bg-secondary/90"
-        size="lg"
-      >
-        Login with Spotify
-      </Button>
     </div>
   );
 };
