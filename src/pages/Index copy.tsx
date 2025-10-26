@@ -369,7 +369,6 @@
 //                 SpotiPlayer
 //               </h1>
 //               <p className="text-sm text-muted-foreground">
-//                 Windows 7 Style Media Player
 //               </p>
 //             </div>
 //             <div className="flex items-center gap-3">
