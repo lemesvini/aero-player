@@ -19,33 +19,33 @@ export const SpotifyAuth = ({ onAuthSuccess }: SpotifyAuthProps) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem("spotify_access_token");
+        if (token) {
+          const response = await fetch("https://api.spotify.com/v1/me", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
 
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem("spotify_access_token");
-      if (token) {
-        const response = await fetch("https://api.spotify.com/v1/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-          onAuthSuccess(token);
-        } else {
-          localStorage.removeItem("spotify_access_token");
+          if (response.ok) {
+            const userData = await response.json();
+            setUser(userData);
+            onAuthSuccess(token);
+          } else {
+            localStorage.removeItem("spotify_access_token");
+          }
         }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Auth check failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    checkAuth();
+  }, [onAuthSuccess]);
 
   const handleLogin = async () => {
     try {
