@@ -98,19 +98,21 @@ const Index = () => {
       const data = await response.json();
 
       if (data.items && Array.isArray(data.items)) {
-        const tracks = data.items.map(
-          (item: { track: Track; played_at: string }) => ({
-            ...item.track,
-            played_at: item.played_at,
-            // Ensure arrays exist
-            artists: item.track?.artists || [],
-            album: {
-              ...item.track?.album,
-              images: item.track?.album?.images || [],
-              release_date: item.track?.album?.release_date || "",
-            },
-          })
-        );
+        const tracks = data.items
+          .filter((item: { track: Track | null }) => item.track !== null)
+          .map(
+            (item: { track: Track; played_at: string }) => ({
+              ...item.track,
+              played_at: item.played_at,
+              // Ensure arrays exist
+              artists: item.track?.artists || [],
+              album: {
+                ...item.track?.album,
+                images: item.track?.album?.images || [],
+                release_date: item.track?.album?.release_date || "",
+              },
+            })
+          );
         setRecentTracks(tracks);
       }
     } catch (error) {
@@ -127,13 +129,15 @@ const Index = () => {
 
       if (data.items && Array.isArray(data.items)) {
         setPlaylists(
-          data.items.map((playlist: Playlist) => ({
-            ...playlist,
-            // Ensure arrays exist
-            images: playlist?.images || [],
-            tracks: playlist?.tracks || { total: 0 },
-            owner: playlist?.owner || { display_name: "Unknown" },
-          }))
+          data.items
+            .filter((playlist: Playlist | null) => playlist !== null)
+            .map((playlist: Playlist) => ({
+              ...playlist,
+              // Ensure arrays exist
+              images: playlist?.images || [],
+              tracks: playlist?.tracks || { total: 0 },
+              owner: playlist?.owner || { display_name: "Unknown" },
+            }))
         );
       }
     } catch (error) {
