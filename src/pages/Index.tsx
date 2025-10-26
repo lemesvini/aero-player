@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { SpotifyAuth } from "@/components/SpotifyAuth";
-import { SpotifyPlayer } from "@/components/SpotifyPlayer";
-import { AlbumArtPanel } from "@/components/AlbumArtPanel";
+import { PlayerView } from "@/components/PlayerView";
 import { RecentlyPlayed } from "@/components/RecentlyPlayed";
 import { Playlists } from "@/components/Playlists";
+import { PlaylistDetails } from "@/components/PlaylistDetails";
+import { QueueDialog } from "@/components/QueueDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 interface Track {
@@ -32,6 +34,9 @@ const Index = () => {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [queue, setQueue] = useState<Track[]>([]);
+  const [queueDialogOpen, setQueueDialogOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
@@ -283,10 +288,22 @@ const Index = () => {
   };
 
   const handlePlaylistSelect = (playlistId: string) => {
+    const playlist = playlists.find((p) => p.id === playlistId);
+    if (playlist) {
+      setSelectedPlaylist(playlist);
+    }
+  };
+
+  const handleAddToQueue = (track: Track) => {
+    setQueue((prev) => [...prev, track]);
     toast({
-      title: "Playlist Selected",
-      description: "Playlist view coming soon",
+      title: "Added to Queue",
+      description: `${track.name} added to queue`,
     });
+  };
+
+  const handleRemoveFromQueue = (index: number) => {
+    setQueue((prev) => prev.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -340,15 +357,14 @@ const Index = () => {
         </header>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Album Art - Left on Desktop */}
-          <div className="hidden lg:block lg:col-span-3">
-            <AlbumArtPanel track={currentTrack} />
-          </div>
+        <Tabs defaultValue="player" className="space-y-6">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+            <TabsTrigger value="player">Player</TabsTrigger>
+            <TabsTrigger value="playlists">Playlists</TabsTrigger>
+          </TabsList>
 
-          {/* Player - Center on Desktop, Full on Mobile */}
-          <div className="lg:col-span-6">
-            <SpotifyPlayer
+          <TabsContent value="player" className="space-y-6">
+            <PlayerView
               currentTrack={currentTrack}
               isPlaying={isPlaying}
               progress={progress}
@@ -359,24 +375,48 @@ const Index = () => {
               onVolumeChange={handleVolumeChange}
               onToggleShuffle={handleToggleShuffle}
               onToggleRepeat={handleToggleRepeat}
+              onOpenQueue={() => setQueueDialogOpen(true)}
               shuffle={shuffle}
               repeat={repeat}
             />
-          </div>
 
-          {/* Library - Right on Desktop, Below on Mobile */}
-          <div className="lg:col-span-3 space-y-4">
-            <RecentlyPlayed
-              tracks={recentTracks}
-              onTrackSelect={handleTrackSelect}
-              currentTrackId={currentTrack?.id}
-            />
-            <Playlists
-              playlists={playlists}
-              onPlaylistSelect={handlePlaylistSelect}
-            />
-          </div>
-        </div>
+            <div className="max-w-4xl mx-auto">
+              <RecentlyPlayed
+                tracks={recentTracks}
+                onTrackSelect={handleTrackSelect}
+                onAddToQueue={handleAddToQueue}
+                currentTrackId={currentTrack?.id}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="playlists">
+            {selectedPlaylist ? (
+              <PlaylistDetails
+                playlist={selectedPlaylist}
+                onBack={() => setSelectedPlaylist(null)}
+                onTrackSelect={handleTrackSelect}
+                onAddToQueue={handleAddToQueue}
+                accessToken={accessToken!}
+              />
+            ) : (
+              <div className="max-w-4xl mx-auto">
+                <Playlists
+                  playlists={playlists}
+                  onPlaylistSelect={handlePlaylistSelect}
+                />
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <QueueDialog
+          open={queueDialogOpen}
+          onOpenChange={setQueueDialogOpen}
+          queue={queue}
+          onRemoveFromQueue={handleRemoveFromQueue}
+          onTrackSelect={handleTrackSelect}
+        />
       </div>
     </div>
   );
