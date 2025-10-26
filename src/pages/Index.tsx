@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search } from "lucide-react";
+import { Library, ListMusic, Search } from "lucide-react";
 import { SpotifyAuth } from "@/components/SpotifyAuth";
-import { PlayerView } from "@/components/PlayerView";
+import { PlayerScreen } from "@/components/PlayerScreen";
 import { RecentlyPlayed } from "@/components/RecentlyPlayed";
 import { Playlists } from "@/components/Playlists";
 import { PlaylistDetails } from "@/components/PlaylistDetails";
@@ -39,7 +39,9 @@ const Index = () => {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(
+    null
+  );
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [queueDialogOpen, setQueueDialogOpen] = useState(false);
@@ -48,6 +50,7 @@ const Index = () => {
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("off");
+  const [isLiked, setIsLiked] = useState(false);
   const [activeTab, setActiveTab] = useState("player");
   const { toast } = useToast();
 
@@ -113,20 +116,18 @@ const Index = () => {
       if (data.items && Array.isArray(data.items)) {
         const tracks = data.items
           .filter((item: { track: Track | null }) => item.track !== null)
-          .map(
-            (item: { track: Track; played_at: string }) => ({
-              ...item.track,
-              played_at: item.played_at,
-              // Ensure arrays exist
-              artists: item.track?.artists || [],
-              album: {
-                id: item.track?.album?.id || "",
-                ...item.track?.album,
-                images: item.track?.album?.images || [],
-                release_date: item.track?.album?.release_date || "",
-              },
-            })
-          );
+          .map((item: { track: Track; played_at: string }) => ({
+            ...item.track,
+            played_at: item.played_at,
+            // Ensure arrays exist
+            artists: item.track?.artists || [],
+            album: {
+              id: item.track?.album?.id || "",
+              ...item.track?.album,
+              images: item.track?.album?.images || [],
+              release_date: item.track?.album?.release_date || "",
+            },
+          }));
         setRecentTracks(tracks);
       }
     } catch (error) {
@@ -187,6 +188,19 @@ const Index = () => {
         setProgress(data.progress_ms || 0);
         setShuffle(data.shuffle_state);
         setRepeat(data.repeat_state);
+
+        // Check if current track is liked
+        if (data.item.id) {
+          try {
+            const likedResponse = await fetchWithAuth(
+              `https://api.spotify.com/v1/me/tracks/contains?ids=${data.item.id}`
+            );
+            const likedData = await likedResponse.json();
+            setIsLiked(likedData[0] || false);
+          } catch (error) {
+            console.error("Error checking if track is liked:", error);
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching playback:", error);
@@ -255,13 +269,20 @@ const Index = () => {
 
   const handleToggleShuffle = async () => {
     try {
+      // Update local state immediately for instant UI feedback
+      setShuffle(!shuffle);
+
       await fetchWithAuth(
         `https://api.spotify.com/v1/me/player/shuffle?state=${!shuffle}`,
         { method: "PUT" }
       );
-      setShuffle(!shuffle);
+
+      // Refresh playback state after Spotify processes the change
+      setTimeout(fetchCurrentPlayback, 800);
     } catch (error) {
       console.error("Error toggling shuffle:", error);
+      // Revert on error
+      setShuffle(shuffle);
     }
   };
 
@@ -269,13 +290,52 @@ const Index = () => {
     try {
       const nextRepeat =
         repeat === "off" ? "context" : repeat === "context" ? "track" : "off";
+
+      // Update local state immediately for instant UI feedback
+      setRepeat(nextRepeat);
+
       await fetchWithAuth(
         `https://api.spotify.com/v1/me/player/repeat?state=${nextRepeat}`,
         { method: "PUT" }
       );
-      setRepeat(nextRepeat);
+
+      // Refresh playback state after Spotify processes the change
+      setTimeout(fetchCurrentPlayback, 800);
     } catch (error) {
       console.error("Error toggling repeat:", error);
+      // Revert on error
+      setRepeat(repeat);
+    }
+  };
+
+  const handleToggleLike = async (trackId: string) => {
+    try {
+      // Update local state immediately for instant UI feedback
+      setIsLiked(!isLiked);
+
+      const endpoint = `https://api.spotify.com/v1/me/tracks?ids=${trackId}`;
+
+      // Use direct fetch with minimal headers as per Spotify API requirements
+      const response = await fetch(endpoint, {
+        method: isLiked ? "DELETE" : "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem("spotify_access_token");
+        setAccessToken(null);
+        throw new Error("Token expired");
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      // Revert on error
+      setIsLiked(isLiked);
     }
   };
 
@@ -343,7 +403,7 @@ const Index = () => {
       fetchPlaylists();
       fetchCurrentPlayback();
 
-      const interval = setInterval(fetchCurrentPlayback, 3000);
+      const interval = setInterval(fetchCurrentPlayback, 1000);
       return () => clearInterval(interval);
     }
   }, [accessToken, fetchCurrentPlayback, fetchPlaylists, fetchRecentlyPlayed]);
@@ -359,97 +419,75 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen p-4 lg:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <header className="glass-panel glass-highlight rounded-2xl p-4">
-          <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-                SpotiPlayer
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Windows 7 Style Media Player
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setSearchDialogOpen(true)}
-                className="gap-2"
-              >
-                <Search className="h-4 w-4" />
-                <span className="hidden sm:inline">Search Songs</span>
-              </Button>
-              <SpotifyAuth onAuthSuccess={setAccessToken} />
-            </div>
-          </div>
-        </header>
-
+    <div className="h-screen flex justify-center items-center bg-gradient-to-b from-black via-black/10 to-black">
+      <div className="absolute left-16 flex flex-col items-center justify-center gap-2">
+        <Button variant="ghost" size="icon">
+          <ListMusic className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon">
+          <Search className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon">
+          <Library className="h-5 w-5" />
+        </Button>
+      </div>
+      <div className="max-w-7xl mx-auto border-2 border-white/10 rounded-2xl">
         {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-            <TabsTrigger value="player">Player</TabsTrigger>
-            <TabsTrigger value="playlists">Playlists</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="player" className="space-y-6">
-            <PlayerView
-              currentTrack={currentTrack}
-              isPlaying={isPlaying}
-              progress={progress}
-              onPlayPause={handlePlayPause}
-              onNext={handleNext}
-              onPrevious={handlePrevious}
-              onSeek={handleSeek}
-              onVolumeChange={handleVolumeChange}
-              onToggleShuffle={handleToggleShuffle}
-              onToggleRepeat={handleToggleRepeat}
-              onOpenQueue={() => setQueueDialogOpen(true)}
-              onAlbumClick={handleAlbumClick}
-              shuffle={shuffle}
-              repeat={repeat}
-            />
-
-            <div className="max-w-4xl mx-auto">
+        <PlayerScreen
+          currentTrack={currentTrack}
+          isPlaying={isPlaying}
+          progress={progress}
+          onPlayPause={handlePlayPause}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onSeek={handleSeek}
+          onToggleShuffle={handleToggleShuffle}
+          onToggleRepeat={handleToggleRepeat}
+          onOpenQueue={() => setQueueDialogOpen(true)}
+          onTrackSelect={handleTrackSelect}
+          onToggleLike={handleToggleLike}
+          shuffle={shuffle}
+          repeat={repeat}
+          isLiked={isLiked}
+          accessToken={accessToken!}
+        />
+        {/* <div className="max-w-4xl mx-auto">
               <RecentlyPlayed
                 tracks={recentTracks}
                 onTrackSelect={handleTrackSelect}
                 onAddToQueue={handleAddToQueue}
                 currentTrackId={currentTrack?.id}
               />
+            </div> */}
+
+        {/* <TabsContent value="playlists">
+          {selectedAlbumId ? (
+            <AlbumDetails
+              albumId={selectedAlbumId}
+              onBack={() => setSelectedAlbumId(null)}
+              onTrackSelect={handleTrackSelect}
+              onAddToQueue={handleAddToQueue}
+              accessToken={accessToken!}
+            />
+          ) : selectedPlaylist ? (
+            <PlaylistDetails
+              playlist={selectedPlaylist}
+              onBack={() => setSelectedPlaylist(null)}
+              onTrackSelect={handleTrackSelect}
+              onAddToQueue={handleAddToQueue}
+              accessToken={accessToken!}
+            />
+          ) : (
+            <div className="max-w-4xl mx-auto">
+              <Playlists
+                playlists={playlists}
+                onPlaylistSelect={handlePlaylistSelect}
+              />
             </div>
-          </TabsContent>
+          )}
+        </TabsContent> */}
 
-          <TabsContent value="playlists">
-            {selectedAlbumId ? (
-              <AlbumDetails
-                albumId={selectedAlbumId}
-                onBack={() => setSelectedAlbumId(null)}
-                onTrackSelect={handleTrackSelect}
-                onAddToQueue={handleAddToQueue}
-                accessToken={accessToken!}
-              />
-            ) : selectedPlaylist ? (
-              <PlaylistDetails
-                playlist={selectedPlaylist}
-                onBack={() => setSelectedPlaylist(null)}
-                onTrackSelect={handleTrackSelect}
-                onAddToQueue={handleAddToQueue}
-                accessToken={accessToken!}
-              />
-            ) : (
-              <div className="max-w-4xl mx-auto">
-                <Playlists
-                  playlists={playlists}
-                  onPlaylistSelect={handlePlaylistSelect}
-                />
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        <QueueDialog
+        {/* <QueueDialog
           open={queueDialogOpen}
           onOpenChange={setQueueDialogOpen}
           queue={queue}
@@ -463,7 +501,7 @@ const Index = () => {
           accessToken={accessToken!}
           onTrackSelect={handleTrackSelect}
           onAddToQueue={handleAddToQueue}
-        />
+        /> */}
       </div>
     </div>
   );
