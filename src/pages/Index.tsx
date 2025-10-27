@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Library, ListMusic, Search } from "lucide-react";
+import { Library, ListMusic, Search, Maximize2, Minimize2 } from "lucide-react";
 import { SpotifyAuth } from "@/components/SpotifyAuth";
 import { PlayerScreen } from "@/components/PlayerScreen";
 import { RecentlyPlayed } from "@/components/RecentlyPlayed";
@@ -57,6 +57,7 @@ const Index = () => {
   const [repeat, setRepeat] = useState("off");
   const [isLiked, setIsLiked] = useState(false);
   const [activeTab, setActiveTab] = useState("player");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { toast } = useToast();
 
   const fetchWithAuth = useCallback(
@@ -512,6 +513,18 @@ const Index = () => {
     setQueue((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleToggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error("Error attempting to enable fullscreen:", err);
+      });
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
   const handleAlbumClick = () => {
     // Use the current track's album ID
     const track = currentTrack;
@@ -544,6 +557,16 @@ const Index = () => {
     }
   }, [accessToken, fetchCurrentPlayback, fetchPlaylists, fetchRecentlyPlayed]);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   if (!accessToken) {
     return <SpotifyAuth onAuthSuccess={setAccessToken} />;
   }
@@ -574,6 +597,18 @@ const Index = () => {
           className="text-white border-white/20 hover:bg-white/5"
         >
           <Library className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleToggleFullscreen}
+          className="text-white border-white/20 hover:bg-white/5"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-5 w-5" />
+          ) : (
+            <Maximize2 className="h-5 w-5" />
+          )}
         </Button>
       </div>
       <div className="max-w-7xl mx-auto border-2 border-white/10 rounded-2xl">
