@@ -58,6 +58,11 @@ const Index = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [activeTab, setActiveTab] = useState("player");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [userProfile, setUserProfile] = useState<{
+    images?: { url: string }[];
+    external_urls?: { spotify: string };
+  } | null>(null);
   const { toast } = useToast();
 
   const fetchWithAuth = useCallback(
@@ -138,6 +143,16 @@ const Index = () => {
       }
     } catch (error) {
       console.error("Error fetching recently played:", error);
+    }
+  }, [fetchWithAuth]);
+
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const response = await fetchWithAuth("https://api.spotify.com/v1/me");
+      const data = await response.json();
+      setUserProfile(data);
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
     }
   }, [fetchWithAuth]);
 
@@ -548,6 +563,7 @@ const Index = () => {
 
   useEffect(() => {
     if (accessToken) {
+      fetchUserProfile();
       fetchRecentlyPlayed();
       fetchPlaylists();
       fetchCurrentPlayback();
@@ -555,7 +571,13 @@ const Index = () => {
       const interval = setInterval(fetchCurrentPlayback, 1000);
       return () => clearInterval(interval);
     }
-  }, [accessToken, fetchCurrentPlayback, fetchPlaylists, fetchRecentlyPlayed]);
+  }, [
+    accessToken,
+    fetchCurrentPlayback,
+    fetchPlaylists,
+    fetchRecentlyPlayed,
+    fetchUserProfile,
+  ]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -565,6 +587,14 @@ const Index = () => {
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () =>
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   if (!accessToken) {
@@ -597,18 +627,6 @@ const Index = () => {
           className="text-white border-white/20 hover:bg-white/5"
         >
           <Library className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleToggleFullscreen}
-          className="text-white border-white/20 hover:bg-white/5"
-        >
-          {isFullscreen ? (
-            <Minimize2 className="h-5 w-5" />
-          ) : (
-            <Maximize2 className="h-5 w-5" />
-          )}
         </Button>
       </div>
       <div className="max-w-7xl mx-auto border-2 border-white/10 rounded-2xl">
@@ -692,6 +710,51 @@ const Index = () => {
           playlists={playlists}
           onPlaylistSelect={handlePlaylistSelect}
         />
+      </div>
+      <div className="absolute right-16 flex flex-col items-center gap-3">
+        <div
+          onClick={() =>
+            window.open(userProfile?.external_urls?.spotify, "_blank")
+          }
+          className="w-10 h-10 rounded-full border-2 border-white/70 hover:border-white/10 transition-all duration-300 cursor-pointer overflow-hidden mb-12"
+        >
+          {userProfile?.images && userProfile.images.length > 0 ? (
+            <img
+              src={userProfile.images[0].url}
+              alt="Profile"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-white/10 flex items-center justify-center">
+              <span className="text-white text-xs">?</span>
+            </div>
+          )}
+        </div>
+        <span className="text-white/50 text-sm">
+          {currentTime.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })}
+        </span>
+        <span className="text-white text-2xl font-light">
+          {currentTime.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleToggleFullscreen}
+          className="text-white border-white/20 hover:bg-white/5 mt-12"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-5 w-5" />
+          ) : (
+            <Maximize2 className="h-5 w-5" />
+          )}
+        </Button>
       </div>
     </div>
   );
